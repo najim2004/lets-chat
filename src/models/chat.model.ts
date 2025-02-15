@@ -1,17 +1,36 @@
-// models/chat.ts
-import mongoose from "mongoose";
+import mongoose, { Document, Model, Schema } from "mongoose";
 
-const MessageSchema = new mongoose.Schema({
-  sender: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-  text: { type: String, required: true },
-  timestamp: { type: Date, default: Date.now },
+// Interface for Chat document
+interface IChat extends Document {
+  participants: mongoose.Types.ObjectId[];
+  lastMessage?: string;
+  updatedAt: Date;
+}
+
+// Chat Schema definition
+const ChatSchema = new Schema<IChat>({
+  participants: [{
+    type: Schema.Types.ObjectId,
+    ref: "User",
+    required: true,
+  }],
+  lastMessage: {
+    type: String,
+    default: null,
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now,
+  },
+}, {
+  timestamps: true, // Automatically manage createdAt and updatedAt
 });
 
-const ChatSchema = new mongoose.Schema({
-  participants: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
-  messages: [MessageSchema],
-});
+// Index for better query performance
+ChatSchema.index({ participants: 1 });
 
-const Chat = mongoose.models.Chat || mongoose.model("Chat", ChatSchema);
+// Model declaration with type safety
+const Chat: Model<IChat> = mongoose.models.Chat || mongoose.model<IChat>("Chat", ChatSchema);
 
+export type { IChat };
 export default Chat;
