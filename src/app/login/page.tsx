@@ -20,8 +20,11 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { useState } from "react";
-import { Eye, EyeOff } from "lucide-react"; // Import icons from lucide-react
+import { Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
+// import { useRouter } from "next/navigation";
+import { useToast } from "@/hooks/use-toast";
+import { ApiResponse } from "../api/types";
 
 const formSchema = z.object({
   email: z.string().email({ message: "Invalid email address" }).min(1, {
@@ -34,6 +37,8 @@ type LoginFormValues = z.infer<typeof formSchema>;
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
+  // const router = useRouter();
+  const { toast } = useToast();
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(formSchema),
@@ -43,12 +48,54 @@ export default function LoginPage() {
     },
   });
 
+  type LoginResponse = ApiResponse & {
+    data?: {
+      token: string;
+      user: {
+        id: string;
+        email: string;
+      };
+    };
+  };
+
   const onSubmit = async (values: LoginFormValues) => {
     try {
-      console.log("Form values:", values);
-      // Add your login logic here
-    } catch (error) {
-      console.error("Login error:", error);
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(values),
+      });
+
+      const data: LoginResponse = await response.json();
+
+      if (!response.ok || !data.success) {
+        toast({
+          variant: "destructive",
+          title: "Login Failed",
+          description: data.message || "Something went wrong",
+        });
+        form.reset();
+        return;
+      }
+
+      if (data?.token) {
+        localStorage.setItem("token", data?.token);
+        toast({
+          variant: "default",
+          title: "Success",
+          description: "Logged in successfully",
+        });
+        // router.push("/dashboard");
+      }
+    } catch (error: any) {
+      console.error(error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "An unexpected error occurred",
+      });
     }
   };
 
@@ -99,10 +146,7 @@ export default function LoginPage() {
                           size="icon"
                           type="button"
                           className="absolute right-2 top-1/2 -translate-y-1/2 bg-transparent border-none active:bg-transparent hover:bg-transparent"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setShowPassword(!showPassword);
-                          }}
+                          onClick={() => setShowPassword(!showPassword)}
                         >
                           {showPassword ? (
                             <EyeOff className="h-4 w-4" />
@@ -125,7 +169,7 @@ export default function LoginPage() {
         </CardContent>
         <CardFooter className="text-center w-full justify-center">
           <p className="text-sm text-gray-600">
-            Don't have an account?{" "}
+            Don&#39;t have an account?{" "}
             <Link href="/signup" className="font-semibold hover:underline">
               Sign up
             </Link>

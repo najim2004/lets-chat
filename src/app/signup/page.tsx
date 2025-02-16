@@ -15,9 +15,17 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Eye, EyeOff } from "lucide-react";
-import { Card, CardHeader, CardContent, CardTitle, CardFooter } from "@/components/ui/card";
+import {
+  Card,
+  CardHeader,
+  CardContent,
+  CardTitle,
+  CardFooter,
+} from "@/components/ui/card";
 import Link from "next/link";
-
+import { useToast } from "@/hooks/use-toast";
+import { ApiResponse } from "../api/types";
+import { useRouter } from "next/navigation";
 const formSchema = z.object({
   username: z.string().min(3, "Username must be at least 3 characters"),
   email: z.string().email("Invalid email address"),
@@ -28,6 +36,7 @@ type FormValues = z.infer<typeof formSchema>;
 
 const Signup = () => {
   const [showPassword, setShowPassword] = useState(false);
+  const { toast } = useToast();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -38,9 +47,40 @@ const Signup = () => {
     },
   });
 
-  const onSubmit = (values: FormValues) => {
-    console.log(values);
-    // Handle signup logic here
+  const router = useRouter();
+
+  const onSubmit = async (values: FormValues) => {
+    try {
+      const response = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(values),
+      });
+
+      const data: ApiResponse = await response.json();
+
+      if (data.success) {
+        toast({
+          title: "Success",
+          description: data.message,
+        });
+        form.reset();
+        router.push("/login");
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: data.message,
+        });
+      }
+    } catch (error: any) {
+      console.log(error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Something went wrong!",
+      });
+    }
   };
 
   return (
@@ -125,7 +165,7 @@ const Signup = () => {
         </CardContent>
         <CardFooter className="text-center w-full justify-center">
           <p className="text-sm text-gray-600">
-            Don't have an account?{" "}
+            Already have an account?{" "}
             <Link href="/login" className="font-semibold hover:underline">
               Login
             </Link>
