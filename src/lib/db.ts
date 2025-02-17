@@ -1,52 +1,38 @@
-// lib/db.ts
 import mongoose from "mongoose";
 
-// Type definitions
-type CachedConnection = {
-  conn: typeof mongoose | null;
-  promise: Promise<typeof mongoose> | null;
-};
+const MONGODB_URI = process.env.NEXT_PUBLIC_MONGODB_URI as string;
 
-// Declare global type
-declare global {
-  var mongoose: CachedConnection | undefined;
+if (!MONGODB_URI) {
+  throw new Error(
+    "Please define the MONGODB_URI environment variable inside .env.local"
+  );
 }
 
-const MONGO_URI = process.env.NEXT_PUBLIC_MONGO_URI || "";
+let cached = (global as any).mongoose;
 
-
-if (!MONGO_URI) {
-  throw new Error("Please define the MONGO_URI environment variable");
+if (!cached) {
+  cached = (global as any).mongoose = { conn: null, promise: null };
 }
 
-// Initialize cache
-const cached: CachedConnection = global.mongoose ?? {
-  conn: null,
-  promise: null,
-};
-
-if (!global.mongoose) {
-  global.mongoose = cached;
-}
-
-async function connectToDatabase(): Promise<typeof mongoose> {
+async function dbConnect() {
   if (cached.conn) {
     return cached.conn;
   }
 
   if (!cached.promise) {
-    cached.promise = mongoose.connect(MONGO_URI).then((mongoose) => {
-      return mongoose;
-    });
+    const opts = {
+      bufferCommands: false,
+    };
+
+    cached.promise = await mongoose
+      .connect(MONGODB_URI, opts)
+      .then((mongoose) => {
+        return mongoose;
+      });
   }
 
-  try {
-    cached.conn = await cached.promise;
-    return cached.conn;
-  } catch (error) {
-    cached.promise = null;
-    throw error;
-  }
+  cached.conn = await cached.promise;
+  return cached.conn;
 }
 
-export default connectToDatabase;
+export default dbConnect;

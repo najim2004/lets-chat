@@ -1,4 +1,4 @@
-import connectToDatabase from "@/lib/db";
+import dbConnect from "@/lib/db";
 import User from "@/models/user.model";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -10,7 +10,7 @@ const handleError = (message: string, status: number): Response => {
 
 export const POST = async (req: Request): Promise<Response> => {
   try {
-    await connectToDatabase();
+    await dbConnect();
     const { email, password }: UserRequest = await req.json();
 
     if (!email || !password) {
@@ -24,7 +24,7 @@ export const POST = async (req: Request): Promise<Response> => {
 
     const token = jwt.sign(
       {
-        id: user._id?.toString(),
+        _id: user._id?.toString(),
         username: user.username,
         email: user.email,
       },

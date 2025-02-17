@@ -3,7 +3,7 @@ import { Server as SocketIOServer } from "socket.io";
 import type { NextApiRequest, NextApiResponse } from "next";
 import type { Server as HTTPServer } from "http";
 import type { Socket } from "socket.io";
-import connectToDatabase from "@/lib/db";
+import dbConnect from "@/lib/db";
 import Chat from "@/models/chat.model";
 
 interface ServerSocket extends HTTPServer {
@@ -48,7 +48,7 @@ export default async function handler(
         async ({ senderId, recipientId, messageText }: MessageData) => {
           console.log(senderId, recipientId, messageText);
           try {
-            await connectToDatabase();
+            await dbConnect();
             const chat = await Chat.findOne({
               participants: { $all: [senderId, recipientId] },
             });

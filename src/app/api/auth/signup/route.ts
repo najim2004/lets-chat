@@ -1,4 +1,4 @@
-import connectToDatabase from "@/lib/db";
+import dbConnect from "@/lib/db";
 import User from "@/models/user.model";
 import bcrypt from "bcryptjs";
 import { ApiResponse, UserRequest } from "../../types";
@@ -9,7 +9,7 @@ const handleError = (message: string, status: number): Response => {
 
 export const POST = async (req: Request): Promise<Response> => {
   try {
-    await connectToDatabase();
+    await dbConnect();
     const { username, email, password }: UserRequest = await req.json();
 
     if (!username || !email || !password) {

@@ -9,6 +9,7 @@ export interface IUser extends Document {
   lastSeen: Date;
   createdAt: Date;
   updatedAt: Date;
+  friends: mongoose.Types.ObjectId[]; // Add friends list
 }
 
 // User schema definition
@@ -42,6 +43,12 @@ const UserSchema = new mongoose.Schema(
       type: Date,
       default: Date.now,
     },
+    friends: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User", // Referencing the User model itself
+      },
+    ], // Add this to store the list of friends
   },
   {
     timestamps: true,
@@ -56,7 +63,7 @@ UserSchema.index({ email: 1, username: 1 });
 export type UserModel = Model<IUser>;
 
 // Create or get existing model
-const User = (mongoose.models.User ||
+const User = (mongoose?.models?.User ||
   mongoose.model<IUser>("User", UserSchema)) as UserModel;
 
 export default User;
