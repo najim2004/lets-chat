@@ -22,7 +22,7 @@ import {
 import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
-// import { useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { ApiResponse } from "../../api/types";
 
@@ -37,7 +37,7 @@ type LoginFormValues = z.infer<typeof formSchema>;
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
-  // const router = useRouter();
+  const router = useRouter();
   const { toast } = useToast();
 
   const form = useForm<LoginFormValues>({
@@ -87,7 +87,7 @@ export default function LoginPage() {
           title: "Success",
           description: "Logged in successfully",
         });
-        // router.push("/dashboard");
+        router.push("/");
       }
     } catch (error: any) {
       console.error(error);

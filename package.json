@@ -2,11 +2,13 @@
   "name": "letschat",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
-    "dev": "next dev",
+    "dev": "node server/server.js",
     "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
+    "start": "NODE_ENV=production node server/server.js",
+    "lint": "next lint",
+    "node": "node server/server.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^4.0.0",
@@ -17,11 +19,13 @@
     "@radix-ui/react-separator": "^1.1.2",
     "@radix-ui/react-slot": "^1.1.2",
     "@radix-ui/react-toast": "^1.2.6",
+    "@types/express": "^5.0.0",
     "bcryptjs": "^2.4.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
+    "express": "^4.21.2",
     "jose": "^5.9.6",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.475.0",

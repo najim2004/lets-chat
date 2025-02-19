@@ -1,6 +1,6 @@
 "use client";
 
-import * as React from "react";
+import { useState, useEffect } from "react";
 import {
   Moon,
   Sun,
@@ -26,28 +26,15 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import ContactList from "@/components/contactlist/contactlist";
+import { io } from "socket.io-client";
+
+const socket = io("http://localhost:3000");
 
 export default function ChatApp() {
-  const a = async () => {
-    const token = localStorage.getItem("token");
-    const response = await fetch("/api/user", {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-    });
+  const [count, setCount] = useState(0);
 
-    const data = await response.json();
-    if (!response.ok) {
-      window.location.href = data?.redirect || "/login";
-    }
-  };
-  React.useEffect(() => {
-    a();
-  }, []);
   const { setTheme, theme } = useTheme();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const conversations = [
     {
@@ -167,13 +154,44 @@ export default function ChatApp() {
       </div>
     </ScrollArea>
   );
+  const a = async () => {
+    const token = localStorage.getItem("token");
+    const response = await fetch("/api/user", {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
 
+    const data = await response.json();
+    if (!response.ok) {
+      window.location.href = data?.redirect || "/login";
+    }
+  };
+  const onSubmit = (e) => {
+    e.preventDefault();
+
+    const message = e.target.message.value;
+    console.log(message);
+    socket.emit("message", message);
+    e.target[0].value = "";
+  };
+  useEffect(() => {
+    a();
+  }, []);
+  useEffect(() => {
+    socket.on("message", (message) => {
+      console.log(message);
+      setCount(count + 1);
+    });
+  }, [setCount, count]);
   return (
     <div className="flex h-screen bg-background text-foreground">
       {/* Sidebar for larger screens */}
       <aside className="hidden md:flex md:w-80 lg:w-96 flex-col border-r">
         <div className="p-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold">Chats</h1>
+          <h1 className="text-2xl font-bold">Chats {count}</h1>
           <Button
             variant="ghost"
             size="icon"
@@ -191,7 +209,7 @@ export default function ChatApp() {
           <Input className="pl-10" placeholder="Search conversations..." />
         </div>
         {/* <ConversationList /> */}
-        <ContactList/>
+        <ContactList />
       </aside>
 
       {/* Main chat area */}
@@ -286,14 +304,15 @@ export default function ChatApp() {
         <Separator />
 
         <footer className="p-4">
-          <form
-            onSubmit={(e) => e.preventDefault()}
-            className="flex items-center space-x-2"
-          >
+          <form onSubmit={onSubmit} className="flex items-center space-x-2">
             <Button type="button" variant="ghost" size="icon">
               <Paperclip className="h-5 w-5" />
             </Button>
-            <Input placeholder="Type a message..." className="flex-1" />
+            <Input
+              name="message"
+              placeholder="Type a message..."
+              className="flex-1"
+            />
             <Button type="submit" size="icon">
               <Send className="h-4 w-4" />
             </Button>
