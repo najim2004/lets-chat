@@ -48,5 +48,6 @@ const MessageSchema = new Schema(
 MessageSchema.index({ chatId: 1, createdAt: -1 });
 
 // Create and export the model
-export const Message =
+const Message =
   mongoose.models.Message || mongoose.model<IMessage>("Message", MessageSchema);
+export default Message;

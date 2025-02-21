@@ -1,6 +1,10 @@
 import { createServer } from "node:http";
 import next from "next";
 import { Server } from "socket.io";
+import dbConnect from "../src/lib/db.ts";
+import User from "../src/models/user.model.ts";
+import dotenv from "dotenv";
+dotenv.config();
 
 const dev = process.env.NODE_ENV !== "production";
 const hostname = "localhost";
@@ -9,7 +13,8 @@ const port = 3000;
 const app = next({ dev, hostname, port });
 const handler = app.getRequestHandler();
 
-app.prepare().then(() => {
+app.prepare().then(async () => {
+  await dbConnect();
   const httpServer = createServer(handler);
 
   const io = new Server(httpServer);
@@ -18,9 +23,9 @@ app.prepare().then(() => {
     console.log(`User connected: ${socket.id}`);
 
     // Listen for events from the client (Frontend)
-    socket.on("message", (data) => {
-      console.log("Message received:", data);
-      io.emit("message", data); // Emit event to all clients
+    socket.on("message", async (data) => {
+      const users = await User.find();
+      io.emit("message", users); // Emit event to all clients
     });
 
     // Handle client disconnect

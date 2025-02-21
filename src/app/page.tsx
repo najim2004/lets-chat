@@ -26,15 +26,18 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import ContactList from "@/components/contactlist/contactlist";
-import { io } from "socket.io-client";
-
-const socket = io("http://localhost:3000");
+import { useGetUser } from "@/hooks/useGetUser";
+import { ContactDetails, User } from "./api/types";
+import useGetContacts from "@/hooks/useGetContacts";
 
 export default function ChatApp() {
-  const [count, setCount] = useState(0);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [contacts, setContacts] = useState<ContactDetails[]>([]);
 
   const { setTheme, theme } = useTheme();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { fetchUser, loading: getUserLoading } = useGetUser();
+  const { fetchContacts, loading: getContactsLoading } = useGetContacts();
 
   const conversations = [
     {
@@ -43,6 +46,7 @@ export default function ChatApp() {
       lastMessage: "Hey, how are you?",
       unread: 2,
       online: true,
+      chatId: "1",
     },
     {
       id: 2,
@@ -50,6 +54,7 @@ export default function ChatApp() {
       lastMessage: "Can we meet tomorrow?",
       unread: 0,
       online: false,
+      chatId: "1",
     },
     {
       id: 3,
@@ -57,6 +62,7 @@ export default function ChatApp() {
       lastMessage: "Thanks for your help!",
       unread: 1,
       online: true,
+      chatId: "1",
     },
     {
       id: 4,
@@ -64,6 +70,7 @@ export default function ChatApp() {
       lastMessage: "The project is done.",
       unread: 0,
       online: false,
+      chatId: "1",
     },
   ];
 
@@ -154,44 +161,30 @@ export default function ChatApp() {
       </div>
     </ScrollArea>
   );
-  const a = async () => {
-    const token = localStorage.getItem("token");
-    const response = await fetch("/api/user", {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-    });
 
-    const data = await response.json();
-    if (!response.ok) {
-      window.location.href = data?.redirect || "/login";
-    }
-  };
   const onSubmit = (e) => {
     e.preventDefault();
-
-    const message = e.target.message.value;
-    console.log(message);
-    socket.emit("message", message);
-    e.target[0].value = "";
   };
   useEffect(() => {
-    a();
-  }, []);
-  useEffect(() => {
-    socket.on("message", (message) => {
-      console.log(message);
-      setCount(count + 1);
+    fetchUser().then((data) => {
+      if (data?.success) {
+        setUser(data?.user || null);
+      }
     });
-  }, [setCount, count]);
+  }, [fetchUser]);
+  useEffect(() => {
+    fetchContacts().then((data) => {
+      if (data?.success) {
+        setContacts(data?.data || []);
+      }
+    });
+  }, [fetchContacts]);
   return (
     <div className="flex h-screen bg-background text-foreground">
       {/* Sidebar for larger screens */}
       <aside className="hidden md:flex md:w-80 lg:w-96 flex-col border-r">
         <div className="p-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold">Chats {count}</h1>
+          <h1 className="text-2xl font-bold">Chats</h1>
           <Button
             variant="ghost"
             size="icon"
@@ -209,7 +202,7 @@ export default function ChatApp() {
           <Input className="pl-10" placeholder="Search conversations..." />
         </div>
         {/* <ConversationList /> */}
-        <ContactList />
+        <ContactList contacts={conversations} />
       </aside>
 
       {/* Main chat area */}

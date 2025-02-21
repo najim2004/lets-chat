@@ -2,37 +2,17 @@ import React from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { ScrollArea } from "../ui/scroll-area";
 import { Button } from "../ui/button";
+import { ContactDetails } from "@/app/api/types";
 
-type Conversation = {
-  id: string;
-  name: string;
-  lastMessage: string;
-  unread: number;
-  online: boolean;
-};
+interface ContactListProps {
+  contacts: ContactDetails[];
+}
 
-const conversations: Conversation[] = [
-  {
-    id: "1",
-    name: "John Doe",
-    lastMessage: "Hey, how are you?",
-    unread: 2,
-    online: true,
-  },
-  {
-    id: "2",
-    name: "Jane Smith",
-    lastMessage: "See you tomorrow!",
-    unread: 0,
-    online: false,
-  },
-];
-
-const ContactList: React.FC = () => {
+const ContactList: React.FC<ContactListProps> = ({ contacts }) => {
   return (
     <ScrollArea className="flex-1">
       <div className="space-y-2 p-2">
-        {conversations.map((conversation) => (
+        {contacts.map((conversation) => (
           <Button
             key={conversation.id}
             variant="ghost"
