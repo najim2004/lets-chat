@@ -18,29 +18,20 @@ async function getContactDetails(
   const [friend, chat] = await Promise.all([
     User.findById(friendId).select("_id username email avatar").lean(),
     Chat.findOne({
-      participants: { $all: [userId, friendId] }
+      participants: { $all: [userId, friendId] },
     })
+      .select("_id")
+      .lean(),
   ]);
 
   if (!friend) return null;
-
-  const unreadCount = chat
-    ? await Message.countDocuments({
-        chatId: chat._id,
-        sender: friendId,
-        isRead: false,
-        deletedFor: { $ne: userId }
-      })
-    : 0;
 
   return {
     id: friend._id?.toString(),
     name: friend.username,
     email: friend.email,
     avatar: friend.avatar,
-    lastMessage: chat?.lastMessage ?? "Let's chat!",
-    unread: unreadCount,
-    chatId: chat?._id?.toString()
+    chatId: chat?._id?.toString(),
   };
 }
 
@@ -70,7 +61,9 @@ export async function GET(
 
     return NextResponse.json({
       success: true,
-      data: contacts.filter((contact): contact is ContactDetails => contact !== null)
+      data: contacts.filter(
+        (contact): contact is ContactDetails => contact !== null
+      ),
     });
   } catch (error) {
     console.error("Error fetching contacts:", error);
@@ -101,7 +94,7 @@ export async function PUT(
 
     const [user, friend] = await Promise.all([
       User.findById(userId),
-      User.findById(friendId)
+      User.findById(friendId),
     ]);
 
     if (!user || !friend) {
@@ -123,11 +116,14 @@ export async function PUT(
       User.findByIdAndUpdate(friendId, { $push: { friends: userId } }),
       Chat.create({
         participants: [userId, friendId],
-        lastMessage: null
-      })
+        lastMessage: null,
+      }),
     ]);
 
-    const contactDetails = await getContactDetails(new Types.ObjectId(friendId), userId);
+    const contactDetails = await getContactDetails(
+      new Types.ObjectId(friendId),
+      userId
+    );
     if (!contactDetails) {
       throw new Error("Failed to create contact");
     }
@@ -135,7 +131,7 @@ export async function PUT(
     return NextResponse.json({
       success: true,
       data: contactDetails,
-      message: "Contact added"
+      message: "Contact added",
     });
   } catch (error) {
     console.error("Error adding contact:", error);
@@ -165,7 +161,7 @@ export async function DELETE(
     const { friendId }: DeleteContactRequest = await request.json();
 
     const chat = await Chat.findOne({
-      participants: { $all: [userId, friendId] }
+      participants: { $all: [userId, friendId] },
     });
 
     await Promise.all([
@@ -175,7 +171,7 @@ export async function DELETE(
         Message.updateMany(
           { chatId: chat._id },
           { $push: { deletedFor: userId } }
-        )
+        ),
     ]);
 
     return NextResponse.json({ success: true, message: "Contact removed" });

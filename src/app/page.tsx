@@ -26,18 +26,14 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import ContactList from "@/components/contactlist/contactlist";
-import { useGetUser } from "@/hooks/useGetUser";
-import { ContactDetails, User } from "./api/types";
-import useGetContacts from "@/hooks/useGetContacts";
+import useAppStore from "@/store/store";
+import SearchInput from "@/components/search-input/search-input";
 
 export default function ChatApp() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
-  const [contacts, setContacts] = useState<ContactDetails[]>([]);
 
   const { setTheme, theme } = useTheme();
-  const { fetchUser, loading: getUserLoading } = useGetUser();
-  const { fetchContacts, loading: getContactsLoading } = useGetContacts();
+  const { getUser, isUserGetting, user, contacts } = useAppStore();
 
   const conversations = [
     {
@@ -166,19 +162,13 @@ export default function ChatApp() {
     e.preventDefault();
   };
   useEffect(() => {
-    fetchUser().then((data) => {
-      if (data?.success) {
-        setUser(data?.user || null);
-      }
-    });
-  }, [fetchUser]);
-  useEffect(() => {
-    fetchContacts().then((data) => {
-      if (data?.success) {
-        setContacts(data?.data || []);
-      }
-    });
-  }, [fetchContacts]);
+    const fetchUser = async () => {
+      await getUser();
+    };
+    if (!isUserGetting && !user) {
+      fetchUser();
+    }
+  }, [getUser, user, isUserGetting]);
   return (
     <div className="flex h-screen bg-background text-foreground">
       {/* Sidebar for larger screens */}
@@ -197,10 +187,7 @@ export default function ChatApp() {
             )}
           </Button>
         </div>
-        <div className="px-4 pb-2 relative">
-          <Search className="absolute left-6 top-1/2 h-4 w-4 -translate-y-1/2 transform text-muted-foreground" />
-          <Input className="pl-10" placeholder="Search conversations..." />
-        </div>
+        <SearchInput/>
         {/* <ConversationList /> */}
         <ContactList contacts={conversations} />
       </aside>

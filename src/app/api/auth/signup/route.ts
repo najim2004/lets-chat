@@ -1,8 +1,12 @@
 import dbConnect from "@/lib/db";
 import User from "@/models/user.model";
 import bcrypt from "bcryptjs";
-import { ApiResponse, UserRequest } from "../../types";
+import { UserRequest } from "../../types";
 
+ interface ApiResponse {
+  message: string;
+  success: boolean;
+}
 const handleError = (message: string, status: number): Response => {
   return new Response(JSON.stringify({ message, success: false }), { status });
 };

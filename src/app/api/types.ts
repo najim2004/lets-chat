@@ -19,8 +19,5 @@ export interface ContactDetails {
   name: string;
   email: string;
   avatar: string;
-  lastMessage: string;
-  unread: number;
   chatId?: string;
-  online?: boolean;
 }

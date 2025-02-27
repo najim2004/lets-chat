@@ -23,8 +23,8 @@ import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import useAppStore, { LoginResponse } from "@/store/store";
 import { useToast } from "@/hooks/use-toast";
-import { ApiResponse } from "../../api/types";
 
 const formSchema = z.object({
   email: z.string().email({ message: "Invalid email address" }).min(1, {
@@ -39,6 +39,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
+  const { login, isLoggingIn } = useAppStore();
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(formSchema),
@@ -48,46 +49,25 @@ export default function LoginPage() {
     },
   });
 
-  type LoginResponse = ApiResponse & {
-    data?: {
-      token: string;
-      user: {
-        id: string;
-        email: string;
-      };
-    };
-  };
-
   const onSubmit = async (values: LoginFormValues) => {
     try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(values),
-      });
+      if (isLoggingIn) return;
 
-      const data: LoginResponse = await response.json();
+      const response: LoginResponse = await login(values);
 
-      if (!response.ok || !data.success) {
-        toast({
-          variant: "destructive",
-          title: "Login Failed",
-          description: data.message || "Something went wrong",
-        });
-        form.reset();
-        return;
-      }
-
-      if (data?.token) {
-        localStorage.setItem("token", data?.token);
+      if (response.success) {
         toast({
           variant: "default",
           title: "Success",
           description: "Logged in successfully",
         });
         router.push("/");
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: response.message || "Login failed",
+        });
       }
     } catch (error: any) {
       console.error(error);
@@ -161,8 +141,12 @@ export default function LoginPage() {
                 )}
               />
 
-              <Button type="submit" className="w-full rounded-sm">
-                Login
+              <Button
+                type="submit"
+                disabled={isLoggingIn}
+                className="w-full rounded-sm"
+              >
+                {isLoggingIn ? "Loading..." : "Login"}
               </Button>
             </form>
           </Form>

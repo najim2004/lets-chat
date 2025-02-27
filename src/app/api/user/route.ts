@@ -8,12 +8,11 @@ type ApiResponse<T> = {
   message?: string;
 };
 
-// GET all users
 export async function GET(request: Request) {
   const _id = request?.headers.get("user_id");
   try {
     await dbConnect();
-    const user = await User.find({ _id }, "-password");
+    const user = await User.findOne({ _id }, "-password");
     const response: ApiResponse<typeof user> = {
       success: true,
       data: user

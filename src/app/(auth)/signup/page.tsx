@@ -26,6 +26,7 @@ import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { ApiResponse } from "../../api/types";
 import { useRouter } from "next/navigation";
+import useAppStore, { CommonResponse } from "@/store/store";
 const formSchema = z.object({
   username: z.string().min(3, "Username must be at least 3 characters"),
   email: z.string().email("Invalid email address"),
@@ -37,6 +38,8 @@ type FormValues = z.infer<typeof formSchema>;
 const Signup = () => {
   const [showPassword, setShowPassword] = useState(false);
   const { toast } = useToast();
+
+  const { signup, isSigningUp } = useAppStore();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -51,18 +54,14 @@ const Signup = () => {
 
   const onSubmit = async (values: FormValues) => {
     try {
-      const response = await fetch("/api/auth/signup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
-      });
+      if (isSigningUp) return;
 
-      const data: ApiResponse = await response.json();
+      const response: CommonResponse = await signup(values);
 
-      if (data.success) {
+      if (response.success) {
         toast({
           title: "Success",
-          description: data.message,
+          description: response.message || "User registration successful",
         });
         form.reset();
         router.push("/login");
@@ -70,7 +69,7 @@ const Signup = () => {
         toast({
           variant: "destructive",
           title: "Error",
-          description: data.message,
+          description: response.message || "Sign Up failed",
         });
       }
     } catch (error: any) {
