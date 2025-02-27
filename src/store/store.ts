@@ -1,5 +1,5 @@
+import { socket } from "@/lib/socket";
 import { create } from "zustand";
-
 export interface CommonResponse {
   success: boolean;
   message?: string;
@@ -42,6 +42,7 @@ export interface SetFriendResponse extends CommonResponse {
 }
 
 interface AuthState {
+  socket: any;
   user: User | null;
   token: string | null;
   contacts: Contact[];
@@ -68,10 +69,13 @@ interface AppState extends AuthState {
   getContacts: () => Promise<void>;
   getSearchUser: (values: { query: string }) => Promise<SearchUserResponse>;
   setFriend: (friendId: string) => Promise<SetFriendResponse>;
+  connectSocket: () => void;
+  disConnectSocket: () => void;
 }
 
 const useAppStore = create<AppState>((set, get) => ({
   // ✅ Auth State
+  socket: null,
   user: null,
   token: null,
   contacts: [],
@@ -138,6 +142,7 @@ const useAppStore = create<AppState>((set, get) => ({
     set({ user: null, token: null });
     localStorage.removeItem("token");
     window.location.href = "/login";
+    get().disConnectSocket();
   },
   // ✅ Get User function
   getUser: async () => {
@@ -164,7 +169,8 @@ const useAppStore = create<AppState>((set, get) => ({
         throw new Error(data.message || "Failed to fetch user data");
       }
       set({ user: data.data });
-      await get().getContacts();
+      get().getContacts();
+      get().connectSocket();
     } catch (error) {
       console.error(error);
     } finally {
@@ -266,6 +272,18 @@ const useAppStore = create<AppState>((set, get) => ({
       };
     } finally {
       set({ isSettingFriend: false });
+    }
+  },
+  // ✅ Connect Socket function
+  connectSocket: () => {
+    if (!get().user?._id || get().socket?.connected) return;
+    socket.connect();
+    set({ socket: socket });
+  },
+  // ✅ Disconnect Socket function
+  disConnectSocket: () => {
+    if (get().socket?.connected) {
+      get().socket?.disconnect();
     }
   },
 }));

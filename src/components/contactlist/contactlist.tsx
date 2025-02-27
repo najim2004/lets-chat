@@ -2,10 +2,10 @@ import React from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { ScrollArea } from "../ui/scroll-area";
 import { Button } from "../ui/button";
-import { ContactDetails } from "@/app/api/types";
+import { Contact } from "@/store/store";
 
 interface ContactListProps {
-  contacts: ContactDetails[];
+  contacts: Contact[];
 }
 
 const ContactList: React.FC<ContactListProps> = ({ contacts }) => {
@@ -21,7 +21,10 @@ const ContactList: React.FC<ContactListProps> = ({ contacts }) => {
             <div className="flex items-center space-x-4">
               <Avatar>
                 <AvatarImage
-                  src={`https://api.dicebear.com/6.x/micah/svg?seed=${conversation.name}`}
+                  src={
+                    conversation?.avatar ||
+                    `https://api.dicebear.com/6.x/micah/svg?seed=${conversation.name}`
+                  }
                 />
                 <AvatarFallback>
                   {conversation.name

@@ -22,7 +22,7 @@ const DEBOUNCE_DELAY = 500;
 const SearchInput = () => {
   const [searchValue, setSearchValue] = useState("");
   const [result, setResult] = useState<User[] | null>(null);
-  const { getSearchUser, isSearching, setFriend, isSettingFriend } =
+  const { getSearchUser, isSearching, setFriend, isSettingFriend, contacts } =
     useAppStore();
 
   const fetchResults = useCallback(
@@ -122,11 +122,17 @@ const SearchInput = () => {
                   <Button
                     size="sm"
                     variant="default"
-                    className="bg-primary"
+                    className={`${
+                      contacts.some((contact) => contact.id === user._id)
+                        ? "bg-transparent text-gray-800 shadow-none border hover:bg-transparent"
+                        : "bg-primary text-white"
+                    } `}
                     disabled={isSettingFriend}
                     onClick={() => handleAddUser(user?._id)}
                   >
-                    {isSettingFriend ? (
+                    {contacts.some((contact) => contact.id === user._id) ? (
+                      "Added"
+                    ) : isSettingFriend ? (
                       <Loader size={20} color="white" />
                     ) : (
                       "Add"

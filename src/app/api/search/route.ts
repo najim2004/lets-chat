@@ -9,13 +9,19 @@ interface SearchResponse {
 }
 
 export async function POST(
-  req: Request
+  request: Request
 ): Promise<NextResponse<SearchResponse>> {
   try {
+    const user_id = request?.headers.get("user_id");
+    if (!user_id) {
+      return NextResponse.json(
+        { success: false, message: "Unauthorized Access" },
+        { status: 401 }
+      );
+    }
     await dbConnect();
 
-    const { query: searchQuery } = (await req.json()) as { query: string };
-    console.log(searchQuery);
+    const { query: searchQuery } = (await request.json()) as { query: string };
 
     if (!searchQuery) {
       return NextResponse.json(
@@ -31,10 +37,15 @@ export async function POST(
       /^[0-9a-fA-F]{24}$/.test(id);
 
     const users = await User.find({
-      $or: [
-        { username: { $regex: searchQuery, $options: "i" } },
-        { email: { $regex: searchQuery, $options: "i" } },
-        { _id: isValidObjectId(searchQuery) ? searchQuery : null },
+      $and: [
+        {
+          $or: [
+            { username: { $regex: searchQuery, $options: "i" } },
+            { email: { $regex: searchQuery, $options: "i" } },
+            { _id: isValidObjectId(searchQuery) ? searchQuery : null },
+          ],
+        },
+        { _id: { $ne: user_id } }, // Exclude the requesting user
       ],
     })
       .select("avatar username _id")

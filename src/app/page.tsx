@@ -165,7 +165,7 @@ export default function ChatApp() {
     const fetchUser = async () => {
       await getUser();
     };
-    if (!isUserGetting && !user) {
+    if (!isUserGetting && !user?._id) {
       fetchUser();
     }
   }, [getUser, user, isUserGetting]);
@@ -187,33 +187,29 @@ export default function ChatApp() {
             )}
           </Button>
         </div>
-        <SearchInput/>
-        {/* <ConversationList /> */}
-        <ContactList contacts={conversations} />
+        <SearchInput />
+        <ContactList contacts={contacts} />
       </aside>
 
       {/* Main chat area */}
       <main className="flex-1 flex flex-col">
         <header className="flex items-center justify-between px-4 py-3 border-b">
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-4 lg:hidden">
             <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="icon" className="md:hidden">
                   <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-80">
+              <SheetContent side="left" className="w-full px-0">
                 <SheetHeader>
                   <SheetTitle>Conversations</SheetTitle>
                 </SheetHeader>
-                <div className="mt-4 relative">
-                  <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 transform text-muted-foreground" />
-                  <Input
-                    className="pl-8"
-                    placeholder="Search conversations..."
-                  />
+
+                <div className="w-full space-y-2">
+                  <SearchInput />
+                  <ContactList contacts={contacts} />
                 </div>
-                <ConversationList />
               </SheetContent>
             </Sheet>
             <Avatar>

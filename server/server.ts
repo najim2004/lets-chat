@@ -28,13 +28,27 @@ app.prepare().then(async () => {
 
   io.on("connection", (socket) => {
     console.log(`User connected: ${socket.id}`);
-    const user_id=socket.handshake.query.user_id;
+    const user_id = Array.isArray(socket?.handshake?.query?.user_id)
+      ? socket?.handshake?.query?.user_id[0]
+      : socket?.handshake?.query?.user_id || "";
+    if (user_id) {
+      onlineUsers.set(user_id, socket.id);
+    }
+
+    io.emit("getOnlineFriends", async () => {
+      const user = await User.findById(user_id).select("friends").lean();
+
+      if (user?.friends) {
+        const onlineFriends = user.friends.filter((friendId) =>
+          onlineUsers.has(friendId.toString())
+        );
+        return onlineFriends;
+      }
+      return [];
+    });
 
     // ✅ Handle user online event
-    socket.on("userOnline", (userId) => {
-      onlineUsers.set(userId, socket.id);
-      io.emit("updateOnlineUsers", Array.from(onlineUsers.keys())); // Send online users list
-    });
+    io.emit("updateOnlineUsers", Array.from(onlineUsers.keys())); // Send online users list
 
     // ✅ Handle message event
     socket.on("message", async (data) => {
@@ -44,15 +58,8 @@ app.prepare().then(async () => {
 
     // ✅ Handle disconnect event
     socket.on("disconnect", () => {
-      const userId = [...onlineUsers.entries()].find(
-        ([, sid]) => sid === socket.id
-      )?.[0];
-
-      if (userId) {
-        onlineUsers.delete(userId);
-        io.emit("updateOnlineUsers", Array.from(onlineUsers.keys())); // Update online users
-      }
-
+      onlineUsers.delete(user_id);
+      io.emit("updateOnlineUsers", Array.from(onlineUsers.keys())); // Send online
       console.log(`User disconnected: ${socket.id}`);
     });
   });
