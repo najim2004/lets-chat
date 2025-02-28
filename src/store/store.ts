@@ -1,5 +1,7 @@
-import { socket } from "@/lib/socket";
 import { create } from "zustand";
+import { io, Socket } from "socket.io-client";
+
+const SOCKET_SERVER_URL = process.env.NEXT_PUBLIC_API_URL;
 export interface CommonResponse {
   success: boolean;
   message?: string;
@@ -46,6 +48,7 @@ interface AuthState {
   user: User | null;
   token: string | null;
   contacts: Contact[];
+  onlineFriends: string[];
   error: string | null;
   isUserGetting: boolean;
   isLoggingIn: boolean;
@@ -79,6 +82,7 @@ const useAppStore = create<AppState>((set, get) => ({
   user: null,
   token: null,
   contacts: [],
+  onlineFriends: [],
   error: null,
   isUserGetting: false,
   isLoggingIn: false,
@@ -277,8 +281,18 @@ const useAppStore = create<AppState>((set, get) => ({
   // ✅ Connect Socket function
   connectSocket: () => {
     if (!get().user?._id || get().socket?.connected) return;
+    const socket: Socket = io(SOCKET_SERVER_URL, {
+      query: { user_id: get().user?._id },
+      autoConnect: false,
+      transports: ["websocket"],
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+    });
     socket.connect();
     set({ socket: socket });
+    socket.on("onlineFriends", (onlineFriends: string[]) => {
+      set({ onlineFriends: onlineFriends });
+    });
   },
   // ✅ Disconnect Socket function
   disConnectSocket: () => {
