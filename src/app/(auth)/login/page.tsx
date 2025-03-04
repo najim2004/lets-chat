@@ -39,7 +39,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
-  const { login, isLoggingIn } = useAppStore();
+  const { login, loading } = useAppStore();
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(formSchema),
@@ -51,7 +51,7 @@ export default function LoginPage() {
 
   const onSubmit = async (values: LoginFormValues) => {
     try {
-      if (isLoggingIn) return;
+      if (loading.auth) return;
 
       const response: LoginResponse = await login(values);
 
@@ -61,7 +61,7 @@ export default function LoginPage() {
           title: "Success",
           description: "Logged in successfully",
         });
-        router.push("/");
+        router.replace("/");
       } else {
         toast({
           variant: "destructive",
@@ -69,7 +69,7 @@ export default function LoginPage() {
           description: response.message || "Login failed",
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error);
       toast({
         variant: "destructive",
@@ -143,10 +143,10 @@ export default function LoginPage() {
 
               <Button
                 type="submit"
-                disabled={isLoggingIn}
+                disabled={loading.auth}
                 className="w-full rounded-sm"
               >
-                {isLoggingIn ? "Loading..." : "Login"}
+                {loading.auth ? "Loading..." : "Login"}
               </Button>
             </form>
           </Form>

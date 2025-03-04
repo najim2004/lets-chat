@@ -2,14 +2,19 @@ import React from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { ScrollArea } from "../ui/scroll-area";
 import { Button } from "../ui/button";
-import useAppStore, { Contact } from "@/store/store";
+import { Contact } from "@/store/store";
 
 interface ContactListProps {
   contacts: Contact[];
+  onContactClick: (id: string) => void;
+  selectedContact: string | null;
 }
 
-const ContactList: React.FC<ContactListProps> = ({ contacts }) => {
-  const { onlineFriends } = useAppStore();
+const ContactList: React.FC<ContactListProps> = ({
+  contacts,
+  onContactClick,
+  selectedContact,
+}) => {
   return (
     <ScrollArea className="flex-1">
       <div className="space-y-2 p-2">
@@ -17,7 +22,10 @@ const ContactList: React.FC<ContactListProps> = ({ contacts }) => {
           <Button
             key={conversation.id}
             variant="ghost"
-            className="w-full justify-start px-2"
+            className={`w-full justify-start px-2 h-max ${
+              selectedContact === conversation.id ? "bg-gray-100" : ""
+            }`}
+            onClick={() => onContactClick(conversation.id)}
           >
             <div className="flex items-center space-x-4">
               <div className="relative">
@@ -35,7 +43,7 @@ const ContactList: React.FC<ContactListProps> = ({ contacts }) => {
                       .join("")}
                   </AvatarFallback>
                 </Avatar>
-                {onlineFriends?.includes(conversation?.id) && (
+                {conversation?.online && (
                   <div className="absolute bottom-0 right-0 w-2 h-2 bg-green-500 rounded-full ml-2"></div>
                 )}
               </div>
@@ -52,7 +60,7 @@ const ContactList: React.FC<ContactListProps> = ({ contacts }) => {
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground truncate">
-                  {conversation.lastMessage}
+                  {conversation.lastMessage || "Let's chat"}
                 </p>
               </div>
             </div>

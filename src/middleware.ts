@@ -6,5 +6,10 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/api/user/:path*","/api/user/contacts/:path*", "/api/search/:path*"],
+  matcher: [
+    "/api/user/:path*",
+    "/api/user/contacts/:path*",
+    "/api/search/:path*",
+    "/api/messages/:path*",
+  ],
 };

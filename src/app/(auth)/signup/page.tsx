@@ -24,7 +24,6 @@ import {
 } from "@/components/ui/card";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
-import { ApiResponse } from "../../api/types";
 import { useRouter } from "next/navigation";
 import useAppStore, { CommonResponse } from "@/store/store";
 const formSchema = z.object({
@@ -39,7 +38,7 @@ const Signup = () => {
   const [showPassword, setShowPassword] = useState(false);
   const { toast } = useToast();
 
-  const { signup, isSigningUp } = useAppStore();
+  const { signup, loading } = useAppStore();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -54,7 +53,7 @@ const Signup = () => {
 
   const onSubmit = async (values: FormValues) => {
     try {
-      if (isSigningUp) return;
+      if (loading.auth) return;
 
       const response: CommonResponse = await signup(values);
 
@@ -72,7 +71,7 @@ const Signup = () => {
           description: response.message || "Sign Up failed",
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.log(error);
       toast({
         variant: "destructive",
@@ -156,8 +155,8 @@ const Signup = () => {
                 )}
               />
 
-              <Button type="submit" className="w-full">
-                Sign Up
+              <Button disabled={loading.auth} type="submit" className="w-full">
+                {loading.auth ? "Loading..." : "Sign Up"}
               </Button>
             </form>
           </Form>

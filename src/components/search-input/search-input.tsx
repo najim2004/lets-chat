@@ -5,11 +5,9 @@ import { useState, useEffect, useCallback } from "react";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "../ui/avatar";
-import useAppStore, {
-  SearchUserResponse,
-  SetFriendResponse,
-} from "@/store/store";
+import useAppStore, { CommonResponse } from "@/store/store";
 import Loader from "../loader";
+import { useToast } from "@/hooks/use-toast";
 
 interface User {
   _id: string;
@@ -20,19 +18,22 @@ interface User {
 const DEBOUNCE_DELAY = 500;
 
 const SearchInput = () => {
-  const [searchValue, setSearchValue] = useState("");
+  const [searchValue, setSearchValue] = useState<string>("");
+  const [isAdding, setIsAdding] = useState<boolean>(false);
+  const [hideResults, setHideResults] = useState<boolean>(false);
   const [result, setResult] = useState<User[] | null>(null);
-  const { getSearchUser, isSearching, setFriend, isSettingFriend, contacts } =
-    useAppStore();
+  const { searchUsers, loading, addFriend, contacts } = useAppStore();
+
+  const { toast } = useToast();
 
   const fetchResults = useCallback(
     async (query: string) => {
-      const response: SearchUserResponse = await getSearchUser({ query });
+      const response = await searchUsers(query);
       if (response.success) {
         setResult(response?.users || []);
       }
     },
-    [getSearchUser]
+    [searchUsers]
   );
 
   useEffect(() => {
@@ -66,13 +67,28 @@ const SearchInput = () => {
 
   const handleAddUser = useCallback(
     async (userId: string) => {
+      setIsAdding(true);
       console.log(`Adding user with ID: ${userId}`);
-      const response: SetFriendResponse = await setFriend(userId);
+      const response: CommonResponse = await addFriend(userId);
       if (response.success) {
+        toast({
+          variant: "default",
+          title: "Success",
+          description: "User added successfully",
+        });
         console.log("User added successfully");
+        setResult(null);
+        setSearchValue("");
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: response?.message || "Failed to add user",
+        });
       }
+      setIsAdding(false);
     },
-    [setFriend]
+    [addFriend, toast]
   );
 
   return (
@@ -81,13 +97,15 @@ const SearchInput = () => {
       <div className="px-4 relative w-full">
         <Search className="absolute left-6 top-1/2 h-4 w-4 -translate-y-1/2 transform text-muted-foreground" />
         <Input
-          className="pl-10 w-full"
+          className="pl-10 h-10 w-full shadow-none"
           placeholder="Search users..."
           value={searchValue}
           onChange={(e) => setSearchValue(e.target.value)}
+          onFocus={() => setHideResults(false)}
+          onBlur={() => setTimeout(() => setHideResults(true), 200)}
           onKeyDown={handleKeyDown}
         />
-        {isSearching && (
+        {loading.search && (
           <div className="absolute right-6 top-1/2 -translate-y-1/2">
             <Loader size={20} />
           </div>
@@ -95,7 +113,7 @@ const SearchInput = () => {
       </div>
 
       {/* Search Results */}
-      {result && (
+      {result && !hideResults && (
         <div className="absolute top-full mt-2 left-0 w-full bg-white shadow-md overflow-hidden z-40">
           {result?.length === 0 ? (
             <div className="p-4 text-sm text-gray-500 text-center">
@@ -127,12 +145,12 @@ const SearchInput = () => {
                         ? "bg-transparent text-gray-800 shadow-none border hover:bg-transparent"
                         : "bg-primary text-white"
                     } `}
-                    disabled={isSettingFriend}
+                    disabled={isAdding}
                     onClick={() => handleAddUser(user?._id)}
                   >
                     {contacts.some((contact) => contact.id === user._id) ? (
                       "Added"
-                    ) : isSettingFriend ? (
+                    ) : isAdding ? (
                       <Loader size={20} color="white" />
                     ) : (
                       "Add"

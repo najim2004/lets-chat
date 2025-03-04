@@ -47,6 +47,13 @@ const MessageSchema = new Schema(
 // Add indexes for better query performance
 MessageSchema.index({ chatId: 1, createdAt: -1 });
 
+// **Pre-save Hook** to Update `lastMessage` in Chat
+MessageSchema.post("save", async (doc) => {
+  await mongoose.model("Chat").findByIdAndUpdate(doc.chatId, {
+    lastMessage: doc.content,
+  });
+});
+
 // Create and export the model
 const Message =
   mongoose.models.Message || mongoose.model<IMessage>("Message", MessageSchema);

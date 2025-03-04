@@ -1,68 +1,72 @@
 import { create } from "zustand";
 import { io, Socket } from "socket.io-client";
 
-const SOCKET_SERVER_URL = process.env.NEXT_PUBLIC_API_URL;
-export interface CommonResponse {
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
+const token = localStorage.getItem("token");
+
+// Common types for API responses
+export type CommonResponse = {
   success: boolean;
   message?: string;
-}
+};
 
-export interface User {
-  _id: string;
-  email?: string;
-  username?: string;
-  avatar?: string;
-  friends?: string[];
-  lastSeen?: Date;
-}
-
-export interface LoginResponse extends CommonResponse {
+export type LoginResponse = CommonResponse & {
   token?: string;
-}
-interface UserResponse extends CommonResponse {
-  data?: User;
-  redirect?: string;
-}
-export interface Contact {
+};
+
+// User related types
+export type User = {
+  _id: string;
+  email: string;
+  username: string;
+  avatar?: string;
+  friends: string[];
+  lastSeen?: Date;
+};
+
+// Contact and messaging types
+export type Contact = {
   id: string;
   name: string;
   email: string;
   avatar: string;
+  online: boolean;
+  chatId?: string;
+  lastMessage?: string;
+  unread: number;
+};
+
+export type Message = {
+  _id: string;
   chatId: string;
-}
+  sender: string;
+  message: string;
+  isRead: boolean;
+  createdAt: Date;
+};
 
-export interface ContactsResponse extends CommonResponse {
-  data?: Contact[];
-}
-
-export interface SearchUserResponse extends CommonResponse {
-  users?: User[];
-}
-
-export interface SetFriendResponse extends CommonResponse {
-  data?: Contact;
-}
-
-interface AuthState {
-  socket: any;
+type State = {
+  socket: Socket | null;
   user: User | null;
   token: string | null;
   contacts: Contact[];
   onlineFriends: string[];
-  error: string | null;
-  isUserGetting: boolean;
-  isLoggingIn: boolean;
-  isSigningUp: boolean;
-  isSearching: boolean;
-  isSettingFriend: boolean;
-}
+  messages: Message[];
+  loading: {
+    user: boolean;
+    auth: boolean;
+    search: boolean;
+    friend: boolean;
+  };
+};
 
-interface AppState extends AuthState {
-  login: (values: {
+type Actions = {
+  login: (credentials: {
     email: string;
     password: string;
   }) => Promise<LoginResponse>;
-  signup: (values: {
+  signup: (data: {
     username: string;
     email: string;
     password: string;
@@ -70,235 +74,281 @@ interface AppState extends AuthState {
   logout: () => void;
   getUser: () => Promise<void>;
   getContacts: () => Promise<void>;
-  getSearchUser: (values: { query: string }) => Promise<SearchUserResponse>;
-  setFriend: (friendId: string) => Promise<SetFriendResponse>;
+  searchUsers: (query: string) => Promise<{ users?: User[] } & CommonResponse>;
+  addFriend: (friendId: string) => Promise<CommonResponse>;
+  getOldMessages: (chatId: string) => Promise<{ messages: Message[] }>;
+  sendMessage: (message: string, chatId: string) => Promise<CommonResponse>;
   connectSocket: () => void;
-  disConnectSocket: () => void;
-}
+  disconnectSocket: () => void;
+};
 
-const useAppStore = create<AppState>((set, get) => ({
-  // ✅ Auth State
+const useAppStore = create<State & Actions>((set, get) => ({
+  // Initial state
   socket: null,
   user: null,
   token: null,
   contacts: [],
   onlineFriends: [],
-  error: null,
-  isUserGetting: false,
-  isLoggingIn: false,
-  isSigningUp: false,
-  isSearching: false,
-  isSettingFriend: false,
+  messages: [],
+  loading: {
+    user: false,
+    auth: false,
+    search: false,
+    friend: false,
+  },
 
-  // ✅ Login function
-  login: async (values) => {
+  // Auth actions
+  login: async (credentials) => {
+    set((state) => ({ loading: { ...state.loading, auth: true } }));
     try {
-      set({ isLoggingIn: true, error: null });
-
-      const response = await fetch("/api/auth/login", {
+      const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
+        body: JSON.stringify(credentials),
       });
-
-      if (!response.ok) throw new Error("Invalid credentials");
-
-      const data: LoginResponse = await response.json();
-      // Set token in localStorage
-      if (data.token && data.success) {
+      const data = await res.json();
+      if (data.success && data.token) {
         localStorage.setItem("token", data.token);
         set({ token: data.token });
-        await get().getUser();
+        get().getUser();
         window.location.href = "/";
       }
-      return data; // Return the response data
-    } catch (error: any) {
-      return { success: false, message: error?.message || "Login failed" };
+      return data;
+    } catch (error: unknown) {
+      console.log(error);
+      return { success: false, message: "Login failed" };
     } finally {
-      set({ isLoggingIn: false });
+      set((state) => ({ loading: { ...state.loading, auth: false } }));
     }
   },
 
-  // ✅ Signup function
-  signup: async (values) => {
+  signup: async (data) => {
+    set((state) => ({ loading: { ...state.loading, auth: true } }));
     try {
-      set({ isSigningUp: true, error: null });
-
-      const response = await fetch("/api/auth/signup", {
+      const res = await fetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
+        body: JSON.stringify(data),
       });
-
-      if (!response.ok) throw new Error("Signup failed");
-
-      const data = await response.json();
-      return data;
-    } catch (error: any) {
-      return { success: false, message: error?.message || "Signup failed" };
+      return await res.json();
+    } catch {
+      return { success: false, message: "Signup failed" };
     } finally {
-      set({ isSigningUp: false });
+      set((state) => ({ loading: { ...state.loading, auth: false } }));
     }
   },
 
-  // ✅ Logout function
   logout: () => {
-    set({ user: null, token: null });
+    get().disconnectSocket();
     localStorage.removeItem("token");
+    set({ user: null, token: null });
     window.location.href = "/login";
-    get().disConnectSocket();
   },
-  // ✅ Get User function
+
   getUser: async () => {
+    set((state) => ({ loading: { ...state.loading, user: true } }));
     try {
-      set({ isUserGetting: true });
-      const token = localStorage.getItem("token");
       if (!token) {
         window.location.href = "/login";
         return;
       }
 
-      const response = await fetch("/api/user", {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+      const res = await fetch("/api/user", {
+        headers: { Authorization: `Bearer ${token}` },
       });
 
-      const data: UserResponse = await response.json();
-
-      if (!response.ok) {
-        window.location.href = data?.redirect || "/login";
-        throw new Error(data.message || "Failed to fetch user data");
-      }
-      set({ user: data.data });
-      get().getContacts();
-      get().connectSocket();
-    } catch (error) {
-      console.error(error);
-    } finally {
-      set({ isUserGetting: false });
-    }
-  },
-  // ✅ Get Contacts function
-  getContacts: async () => {
-    try {
-      const token = localStorage.getItem("token");
-      if (!token) {
+      if (res.status === 401) {
         window.location.href = "/login";
         return;
       }
+      const data = await res.json();
 
-      const response = await fetch("/api/user/contacts", {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      const data: ContactsResponse = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Failed to fetch contacts");
-      }
       if (data.success) {
-        set({ contacts: data.data || [] });
+        set({ user: data.data });
+        get().getContacts();
+        get().connectSocket();
       }
-    } catch (error) {
-      console.error(error);
+    } finally {
+      set((state) => ({ loading: { ...state.loading, user: false } }));
     }
   },
-  // ✅ Get Search User function
-  getSearchUser: async (values) => {
-    try {
-      set({ isSearching: true });
-      const token = localStorage.getItem("token");
-      if (!token) {
-        window.location.href = "/login";
-        return { success: false, message: "Unauthorized access" };
-      }
 
-      const response = await fetch(`/api/search`, {
+  getContacts: async () => {
+    if (!token) {
+      window.location.href = "/login";
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/user/contacts", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (res.status === 401) {
+        window.location.href = "/login";
+        return;
+      }
+      const data = await res.json();
+      if (data.success) {
+        if (get().onlineFriends.length > 0) {
+          const contacts = data.data.map((contact: Contact) => ({
+            ...contact,
+            online: get().onlineFriends.includes(contact.id),
+          }));
+          set({ contacts });
+        } else {
+          set({ contacts: data.data || [] });
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fetch contacts:", error);
+    }
+  },
+
+  searchUsers: async (query) => {
+    set((state) => ({ loading: { ...state.loading, search: true } }));
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) throw new Error("Unauthorized");
+
+      const res = await fetch("/api/search", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
         },
-        body: JSON.stringify(values),
+        body: JSON.stringify({ query }),
       });
 
-      const data: SearchUserResponse = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Failed to fetch users");
+      if (res.status === 401) {
+        window.location.href = "/login";
+        return;
       }
-      return data;
-    } catch (error) {
-      console.error(error);
-      return { success: false, message: "Failed to fetch users" };
+      return await res.json();
+    } catch {
+      return { success: false, message: "Search failed" };
     } finally {
-      set({ isSearching: false });
+      set((state) => ({ loading: { ...state.loading, search: false } }));
     }
   },
-  // ✅ Set Friend function
-  setFriend: async (friendId: string) => {
+
+  addFriend: async (friendId) => {
+    return new Promise((resolve) => {
+      get().socket?.emit("add_friend", friendId, (response: CommonResponse) => {
+        resolve(response);
+      });
+      setTimeout(
+        () => resolve({ success: false, message: "Request timeout" }),
+        5000
+      );
+    });
+  },
+  getOldMessages: async (chatId) => {
     try {
-      set({ isSettingFriend: true });
-      const token = localStorage.getItem("token");
       if (!token) {
         window.location.href = "/login";
-
-        return { success: false, message: "Unauthorized access" };
+        return;
       }
-
-      const response = await fetch(`/api/user/contacts`, {
-        method: "PUT",
+      const res = await fetch(`/api/messages/${chatId}`, {
+        method: "GET",
         headers: {
-          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
         },
-        body: JSON.stringify({ friendId }),
       });
-      const data: SetFriendResponse = await response.json();
 
-      if (!response.ok) {
-        throw new Error(data?.message || "Failed to set friend");
+      if (res.status === 401) {
+        window.location.href = "/login";
+        return;
+      }
+      const data = await res.json();
+      if (data.success) {
+        set({ messages: data.messages });
       }
       return data;
-      await get().getContacts();
-    } catch (error: any) {
-      console.error(error);
-      return {
-        success: false,
-        message: error?.message || "Failed to set friend",
-      };
-    } finally {
-      set({ isSettingFriend: false });
+    } catch {
+      return { success: false, message: "Failed to fetch messages" };
     }
   },
-  // ✅ Connect Socket function
+
   connectSocket: () => {
-    if (!get().user?._id || get().socket?.connected) return;
-    const socket: Socket = io(SOCKET_SERVER_URL, {
-      query: { user_id: get().user?._id },
+    const userId = get().user?._id;
+    if (!userId || get().socket?.connected) return;
+
+    const socket = io(API_URL!, {
+      query: { user_id: userId },
       autoConnect: false,
       transports: ["websocket"],
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000,
     });
+
     socket.connect();
-    set({ socket: socket });
+    set({ socket });
+
     socket.on("onlineFriends", (onlineFriends: string[]) => {
-      set({ onlineFriends: onlineFriends });
+      set((state) => ({
+        onlineFriends,
+        contacts: state.contacts.map((contact) => ({
+          ...contact,
+          online: onlineFriends.includes(contact.id),
+        })),
+      }));
+    });
+
+    socket.on("last_message", (data: { chatId: string; message: string }) => {
+      set((state) => ({
+        contacts: state.contacts.map((contact) => {
+          if (contact.chatId === data.chatId) {
+            return { ...contact, lastMessage: data.message };
+          }
+          return contact;
+        }),
+      }));
+    });
+    socket.on("unread_count", (data: { chatId: string; count: number }) => {
+      set((state) => ({
+        contacts: state.contacts.map((contact) => {
+          if (contact.chatId === data.chatId) {
+            return { ...contact, unread: data.count };
+          }
+          return contact;
+        }),
+      }));
+    });
+    socket.on("message", (data: { chatId: string; message: string }) => {
+      set((state) => ({
+        contacts: state.contacts.map((contact) => {
+          if (contact.chatId === data.chatId) {
+            return { ...contact, lastMessage: data.message };
+          }
+          return contact;
+        }),
+      }));
+    });
+
+    socket.on("friend_added", (contact: Contact) => {
+      set((state) => ({ contacts: [...state.contacts, contact] }));
     });
   },
-  // ✅ Disconnect Socket function
-  disConnectSocket: () => {
-    if (get().socket?.connected) {
-      get().socket?.disconnect();
-    }
+
+  sendMessage: async (message, chatId) => {
+    return new Promise((resolve) => {
+      get().socket?.emit(
+        "message",
+        { chatId, message, sender: get().user?._id },
+        (response: CommonResponse) => {
+          resolve(response);
+        }
+      );
+      setTimeout(
+        () => resolve({ success: false, message: "Request timeout" }),
+        5000
+      );
+    });
+  },
+
+  disconnectSocket: () => {
+    get().socket?.disconnect();
+    set({ socket: null });
   },
 }));
 
