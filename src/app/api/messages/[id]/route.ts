@@ -4,14 +4,14 @@ import { NextResponse } from "next/server";
 
 export async function GET(
   req: Request,
-  { params }: { params: { chatId: string } }
+  { params }: { params: { id: string } }
 ) {
+  // Get chatId from params
+  const {id:chatId} = params
   try {
+
     // Connect to MongoDB
     await dbConnect();
-
-    // Get chatId from params
-    const { chatId } = params;
 
     // Validate chatId
     if (!chatId) {

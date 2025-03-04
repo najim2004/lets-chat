@@ -6,7 +6,7 @@ import User from "../src/models/user.model.ts";
 import dotenv from "dotenv";
 import Message from "../src/models/message.model.ts";
 import Chat from "../src/models/chat.model.ts";
-import { Types } from "mongoose";
+import { startSession, Types } from "mongoose";
 dotenv.config();
 
 type ObjectId = Types.ObjectId;
@@ -144,64 +144,83 @@ app.prepare().then(async () => {
       onlineUsers.set(userId, socket.id);
       updateNetwork(userId, io);
     }
+    socket.on("join_chat", (chatId) => {
+      socket.join(chatId);
+      console.log(`User joined chat room: ${chatId}`);
+    });
 
     socket.on("add_friend", async (friendId: string, callback) => {
+      const session = await startSession();
+      session.startTransaction();
+
       try {
-        await User.bulkWrite([
-          {
-            updateOne: {
-              filter: { _id: userId, friends: { $ne: friendId } },
-              update: { $addToSet: { friends: friendId } },
+        await Chat.create([{ participants: [userId, friendId] }], { session });
+        await User.bulkWrite(
+          [
+            {
+              updateOne: {
+                filter: { _id: userId, friends: { $ne: friendId } },
+                update: { $addToSet: { friends: friendId } },
+              },
             },
-          },
-          {
-            updateOne: {
-              filter: { _id: friendId, friends: { $ne: userId } },
-              update: { $addToSet: { friends: userId } },
+            {
+              updateOne: {
+                filter: { _id: friendId, friends: { $ne: userId } },
+                update: { $addToSet: { friends: userId } },
+              },
             },
-          },
+          ],
+          { session }
+        );
+
+        await session.commitTransaction();
+        session.endSession();
+
+        const [updatedContact, myContact] = await Promise.all([
+          getContactDetails(new Types.ObjectId(friendId), userId, true),
+          getContactDetails(new Types.ObjectId(userId), friendId, true),
         ]);
 
-        const updatedContact = await getContactDetails(
-          new Types.ObjectId(friendId),
-          userId,
-          true
-        );
-        const myContact = await getContactDetails(
-          new Types.ObjectId(userId),
-          friendId,
-          true
-        );
-
-        const finalContact = {
-          ...updatedContact,
-          online: onlineUsers.has(friendId),
-        };
-        const finalMyContact = {
-          ...myContact,
-          online: onlineUsers.has(userId),
-        };
-
-        io.to(onlineUsers.get(userId)!).emit("friend_added", finalContact);
-        io.to(onlineUsers.get(friendId)!).emit("friend_added", finalMyContact);
+        const notify = (id: string, contact: any) =>
+          io
+            .to(onlineUsers.get(id)!)
+            .emit("friend_added", { ...contact, online: onlineUsers.has(id) });
+        notify(userId, updatedContact);
+        notify(friendId, myContact);
 
         callback({ success: true, message: "Friend added successfully!" });
       } catch (error) {
+        await session.abortTransaction();
+        session.endSession();
         console.error("Add friend error:", error);
         callback({ success: false, message: "Failed to add friend!" });
       }
     });
 
-    socket.on("send_message", async ({ chatId, message, sender }) => {
+    socket.on("message", async ({ chatId, message }, callback) => {
       try {
-        await Message.create({ chatId, message, sender });
-        await Chat.findByIdAndUpdate(chatId, { lastMessage: message });
-        io.to(chatId).emit("update_last_message", {
+        // Create new message
+        const newMessage = await Message.create({
           chatId,
-          lastMessage: message,
+          content: message,
+          sender: userId,
+          isRead: false,
+          createdAt: new Date(),
         });
+
+        // Emit message to chat room with full message details
+        io.to(chatId).emit("message", {
+          _id: newMessage._id,
+          chatId,
+          content: message,
+          sender: userId,
+          isRead: false,
+          createdAt: newMessage.createdAt,
+        });
+        callback({ success: true, message: "Message send successfully!" });
       } catch (error) {
         console.error("Message sending error:", error);
+        callback({ success: false, message: "Failed to send message!" });
       }
     });
 

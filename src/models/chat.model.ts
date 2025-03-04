@@ -19,7 +19,7 @@ const ChatSchema = new Schema<IChat>(
     ],
     lastMessage: {
       type: String,
-      default: null,
+      default: "Les't start the conversation!",
     },
   },
   {

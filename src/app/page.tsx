@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Moon, Sun, Send, Phone, Video, Paperclip } from "lucide-react";
 import { useTheme } from "next-themes";
 
@@ -14,6 +14,8 @@ import ContactList from "@/components/contactlist/contactlist";
 import useAppStore, { Contact } from "@/store/store";
 import SearchInput from "@/components/search-input/search-input";
 import Drawer from "@/components/drawer/drawer";
+import Loader from "@/components/loader";
+import { useToast } from "@/hooks/use-toast";
 
 export default function ChatApp() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -22,52 +24,74 @@ export default function ChatApp() {
     Contact | undefined | null
   >(null);
   const { setTheme, theme } = useTheme();
-  const { getUser, user, contacts } = useAppStore();
-
-  const messages = [
-    {
-      id: 1,
-      sender: "Alice Johnson",
-      content: "Hey there! How's it going?",
-      time: "10:00 AM",
-    },
-    {
-      id: 2,
-      sender: "You",
-      content: "Hi Alice! I'm doing well, thanks. How about you?",
-      time: "10:05 AM",
-    },
-    {
-      id: 3,
-      sender: "Alice Johnson",
-      content: "I'm great! Just finished a big project at work.",
-      time: "10:10 AM",
-    },
-    {
-      id: 4,
-      sender: "You",
-      content:
-        "That's awesome! Congratulations on completing the project. What was it about?",
-      time: "10:15 AM",
-    },
-    {
-      id: 5,
-      sender: "Alice Johnson",
-      content:
-        "It was a new feature for our app. We added AI-powered recommendations.",
-      time: "10:20 AM",
-    },
-    {
-      id: 6,
-      sender: "You",
-      content:
-        "Wow, that sounds really interesting! How long did it take to implement?",
-      time: "10:25 AM",
-    },
-  ];
+  const {
+    getUser,
+    user,
+    contacts,
+    getOldMessages,
+    messages,
+    sendMessage,
+    joinChat,
+    loading,
+  } = useAppStore();
+  const { toast } = useToast();
+  // const messages = [
+  //   {
+  //     id: 1,
+  //     sender: "Alice Johnson",
+  //     content: "Hey there! How's it going?",
+  //     time: "10:00 AM",
+  //   },
+  //   {
+  //     id: 2,
+  //     sender: "You",
+  //     content: "Hi Alice! I'm doing well, thanks. How about you?",
+  //     time: "10:05 AM",
+  //   },
+  //   {
+  //     id: 3,
+  //     sender: "Alice Johnson",
+  //     content: "I'm great! Just finished a big project at work.",
+  //     time: "10:10 AM",
+  //   },
+  //   {
+  //     id: 4,
+  //     sender: "You",
+  //     content:
+  //       "That's awesome! Congratulations on completing the project. What was it about?",
+  //     time: "10:15 AM",
+  //   },
+  //   {
+  //     id: 5,
+  //     sender: "Alice Johnson",
+  //     content:
+  //       "It was a new feature for our app. We added AI-powered recommendations.",
+  //     time: "10:20 AM",
+  //   },
+  //   {
+  //     id: 6,
+  //     sender: "You",
+  //     content:
+  //       "Wow, that sounds really interesting! How long did it take to implement?",
+  //     time: "10:25 AM",
+  //   },
+  // ];
 
   const onSubmit = (e) => {
     e.preventDefault();
+    const message = e.target.message.value;
+    if (message.length <= 0 || loading.message) return;
+    const res = sendMessage(message, selectedContactDetails?.chatId || "");
+    // console.log(res);
+    if (res?.success) {
+      e.target.message.value = "";
+    } else {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: res?.message || "Failed to send message",
+      });
+    }
   };
   useEffect(() => {
     const fetchUser = async () => {
@@ -78,14 +102,22 @@ export default function ChatApp() {
     }
   }, [getUser, user?._id]);
 
+  const fetchOldMessages = useCallback(
+    async (chatId: string) => {
+      await getOldMessages(chatId);
+    },
+    [getOldMessages]
+  );
   useEffect(() => {
     if (selectedContact) {
       const contact = contacts.find((c) => c.id === selectedContact);
+      fetchOldMessages(contact?.chatId || "");
       setSelectedContactDetails(contact);
+      joinChat(contact?.chatId || "");
     } else {
       setSelectedContactDetails(null);
     }
-  }, [selectedContact, contacts]);
+  }, [selectedContact, contacts, fetchOldMessages, joinChat]);
   return (
     <div className="flex h-screen bg-background text-foreground">
       {/* Sidebar for larger screens */}
@@ -183,27 +215,30 @@ export default function ChatApp() {
 
         <ScrollArea className="flex-1 p-4">
           <div className="space-y-4">
-            {messages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`flex ${
-                  msg.sender === "You" ? "justify-end" : "justify-start"
-                }`}
-              >
+            {messages
+              ?.slice()
+              .reverse()
+              .map((msg) => (
                 <div
-                  className={`max-w-[70%] ${
-                    msg.sender === "You"
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted"
-                  } rounded-lg p-3`}
+                  key={msg._id}
+                  className={`flex ${
+                    msg.sender === user?._id ? "justify-end" : "justify-start"
+                  }`}
                 >
-                  <p className="text-sm">{msg.content}</p>
-                  <p className="text-xs text-right mt-1 opacity-70">
-                    {msg.time}
-                  </p>
+                  <div
+                    className={`max-w-[70%] ${
+                      msg.sender === user?._id
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted"
+                    } rounded-lg p-3`}
+                  >
+                    <p className="text-sm">{msg.content}</p>
+                    <p className="text-xs text-right mt-1 opacity-70">
+                      {new Date(msg.createdAt).toLocaleTimeString()}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
           </div>
         </ScrollArea>
 
@@ -219,8 +254,12 @@ export default function ChatApp() {
               placeholder="Type a message..."
               className="flex-1"
             />
-            <Button type="submit" size="icon">
-              <Send className="h-4 w-4" />
+            <Button disabled={loading.message} type="submit" size="icon">
+              {loading.message ? (
+                <Loader size={20} color="white" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
             </Button>
           </form>
         </footer>

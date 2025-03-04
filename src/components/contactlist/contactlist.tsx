@@ -37,8 +37,8 @@ const ContactList: React.FC<ContactListProps> = ({
                     }
                   />
                   <AvatarFallback>
-                    {conversation.name
-                      .split(" ")
+                    {conversation?.name
+                      ?.split(" ")
                       .map((n) => n[0])
                       .join("")}
                   </AvatarFallback>

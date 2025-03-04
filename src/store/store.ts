@@ -41,7 +41,7 @@ export type Message = {
   _id: string;
   chatId: string;
   sender: string;
-  message: string;
+  content: string;
   isRead: boolean;
   createdAt: Date;
 };
@@ -58,6 +58,8 @@ type State = {
     auth: boolean;
     search: boolean;
     friend: boolean;
+    oldMessages: boolean;
+    message: boolean;
   };
 };
 
@@ -78,6 +80,7 @@ type Actions = {
   addFriend: (friendId: string) => Promise<CommonResponse>;
   getOldMessages: (chatId: string) => Promise<{ messages: Message[] }>;
   sendMessage: (message: string, chatId: string) => Promise<CommonResponse>;
+  joinChat: (chatId: string) => void;
   connectSocket: () => void;
   disconnectSocket: () => void;
 };
@@ -95,6 +98,8 @@ const useAppStore = create<State & Actions>((set, get) => ({
     auth: false,
     search: false,
     friend: false,
+    oldMessages: false,
+    message: false,
   },
 
   // Auth actions
@@ -245,6 +250,7 @@ const useAppStore = create<State & Actions>((set, get) => ({
   },
   getOldMessages: async (chatId) => {
     try {
+      set((state) => ({ loading: { ...state.loading, oldMessages: true } }));
       if (!token) {
         window.location.href = "/login";
         return;
@@ -263,11 +269,13 @@ const useAppStore = create<State & Actions>((set, get) => ({
       }
       const data = await res.json();
       if (data.success) {
-        set({ messages: data.messages });
+        set((state) => ({ messages: data.data }));
       }
       return data;
     } catch {
       return { success: false, message: "Failed to fetch messages" };
+    } finally {
+      set((state) => ({ loading: { ...state.loading, oldMessages: false } }));
     }
   },
 
@@ -314,14 +322,15 @@ const useAppStore = create<State & Actions>((set, get) => ({
         }),
       }));
     });
-    socket.on("message", (data: { chatId: string; message: string }) => {
+    socket.on("message", (data: Message) => {
       set((state) => ({
         contacts: state.contacts.map((contact) => {
           if (contact.chatId === data.chatId) {
-            return { ...contact, lastMessage: data.message };
+            return { ...contact, lastMessage: data.content };
           }
           return contact;
         }),
+        messages: [...state.messages, data],
       }));
     });
 
@@ -331,19 +340,27 @@ const useAppStore = create<State & Actions>((set, get) => ({
   },
 
   sendMessage: async (message, chatId) => {
-    return new Promise((resolve) => {
-      get().socket?.emit(
-        "message",
-        { chatId, message, sender: get().user?._id },
-        (response: CommonResponse) => {
-          resolve(response);
-        }
-      );
-      setTimeout(
-        () => resolve({ success: false, message: "Request timeout" }),
-        5000
-      );
-    });
+    set((state) => ({ loading: { ...state.loading, message: true } }));
+    try {
+      return new Promise((resolve) => {
+        get().socket?.emit(
+          "message",
+          { chatId, message, sender: get().user?._id },
+          (response: CommonResponse) => {
+            resolve(response);
+          }
+        );
+        setTimeout(
+          () => resolve({ success: false, message: "Request timeout" }),
+          5000
+        );
+      });
+    } finally {
+      set((state) => ({ loading: { ...state.loading, message: false } }));
+    }
+  },
+  joinChat: (chatId) => {
+    get().socket?.emit("join_chat", chatId);
   },
 
   disconnectSocket: () => {
